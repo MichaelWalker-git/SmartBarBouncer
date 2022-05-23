@@ -2,7 +2,7 @@ import {Duration, Stack, StackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import {Bucket, EventType} from "aws-cdk-lib/aws-s3";
 import {LambdaIntegration, RestApi} from "aws-cdk-lib/aws-apigateway";
-import {Effect, PolicyDocument, PolicyStatement, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
+import {Effect, ManagedPolicy, PolicyDocument, PolicyStatement, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {NodejsFunction} from "aws-cdk-lib/aws-lambda-nodejs";
 import {Runtime} from "aws-cdk-lib/aws-lambda";
 import {join} from "path";
@@ -14,8 +14,6 @@ export class CdkInfraStack extends Stack {
         const pictureBucket = new Bucket(this, "pictureBucket", {
             bucketName: "picturebucket-assets",
         });
-
-
 
         const restGateway = new RestApi(this, "assets-api", {
             restApiName: "Static assets provider",
@@ -45,26 +43,6 @@ export class CdkInfraStack extends Stack {
             ],
         });
 
-        const inlineUploadPictures = new Role(this, 'inlineUploadPictures', {
-            assumedBy: new ServicePrincipal('lambda.amazonaws.com'),
-            inlinePolicies: {
-                S3Access: s3WriteACcess
-            }
-        });
-
-
-        const uploadFileLambda = new NodejsFunction(this, 'writeToS3Function', {
-            memorySize: 1024,
-            timeout: Duration.seconds(5),
-            runtime: Runtime.NODEJS_14_X,
-            handler: 'handler',
-            entry: join(__dirname, '/lambda/imageUploader.ts'),
-            environment: {
-                'BUCKET_NAME': pictureBucket.bucketName,
-            },
-            role: inlineUploadPictures
-        });
-
         const s3PictureBucketAccess = new PolicyDocument({
             statements: [
                 new PolicyStatement({
@@ -85,33 +63,25 @@ export class CdkInfraStack extends Stack {
             ],
         });
 
-        const inlinePolicyForTextractLambdaRole = new Role(this, 'inlinePolicyForTextractLambdaRole', {
+        const inlineUploadPictures = new Role(this, 'inlineUploadPictures', {
             assumedBy: new ServicePrincipal('lambda.amazonaws.com'),
             inlinePolicies: {
                 Textract: textractAccess,
-                S3Access: s3PictureBucketAccess
-            }
+                S3GetAccess: s3PictureBucketAccess,
+                S3WriteAccess: s3WriteACcess            }
         });
 
-        const textractPullDriverLicenseInfoLambda = new NodejsFunction(this, 'textractPullDriverLicenseInfoLambda', {
+        const uploadFileLambda = new NodejsFunction(this, 'writeToS3Function', {
             memorySize: 1024,
             timeout: Duration.seconds(5),
             runtime: Runtime.NODEJS_14_X,
             handler: 'handler',
-            entry: join(__dirname, '/lambda/textract.ts'),
+            entry: join(__dirname, '/lambda/imageUploader.ts'),
             environment: {
                 'BUCKET_NAME': pictureBucket.bucketName,
             },
-            role: inlinePolicyForTextractLambdaRole,
+            role: inlineUploadPictures
         });
-
-        // trigger lambda on put events on pictureBucket s3 bucket, in folder driverLicense
-        pictureBucket.addEventNotification(
-            EventType.OBJECT_CREATED,
-            new LambdaDestination(textractPullDriverLicenseInfoLambda),
-            {prefix: 'driverLicense/'},
-
-        )
 
         const rekogitionAccess = new PolicyDocument({
             statements: [
@@ -128,7 +98,8 @@ export class CdkInfraStack extends Stack {
             assumedBy: new ServicePrincipal('lambda.amazonaws.com'),
             inlinePolicies: {
                 Rekogition: rekogitionAccess,
-                S3Access: s3PictureBucketAccess
+                S3GetAccess: s3PictureBucketAccess,
+                S3WriteAccess: s3WriteACcess
             }
         });
 
@@ -144,6 +115,11 @@ export class CdkInfraStack extends Stack {
             },
             role: compareTwoFacesRole
         });
+
+        [compareTwoImagesLambda, uploadFileLambda].forEach((lambda: NodejsFunction) => lambda.role?.addManagedPolicy(
+            ManagedPolicy.fromAwsManagedPolicyName(
+                'service-role/AWSLambdaBasicExecutionRole',
+            )));
 
         const images_api = restGateway.root.addResource("images");
         images_api.addMethod('Post', new LambdaIntegration(uploadFileLambda))

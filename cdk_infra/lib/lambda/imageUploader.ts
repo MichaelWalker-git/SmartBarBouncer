@@ -3,6 +3,7 @@ import {PutObjectRequest} from 'aws-sdk/clients/s3';
 import {APIGatewayProxyEventV2} from 'aws-lambda';
 
 const s3 = new AWS.S3()
+const client = new AWS.Textract();
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<any> => {
     const bucketName = process.env.BUCKET_NAME as string;
@@ -39,9 +40,18 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<any> => {
         Key: full_path
     }
     const response = await s3.putObject(putObjectInput).promise();
-    console.log(JSON.stringify(putObjectInput))
     try {
         console.log("Successful" , response)
+        const params: AWS.Textract.AnalyzeIDRequest = {
+            DocumentPages: [{
+                S3Object: {
+                    Bucket: bucketName,
+                    Name: full_path
+                }
+            }]
+        };
+        const textractResponse: AWS.Textract.AnalyzeIDResponse = await client.analyzeID(params).promise();
+
         return {
             'statusCode': 200,
             'headers': {
@@ -49,10 +59,12 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<any> => {
                 'Access-Control-Allow-Origin': '*',
             },
             'body': JSON.stringify({
-                response
+                response: textractResponse,
+                driverLicenseKey: `${full_path}`
             })
         }
     } catch(err){
         return errorCode(`Error - ${JSON.stringify(err)}`);
     }
+
 }
