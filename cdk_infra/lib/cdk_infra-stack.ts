@@ -1,11 +1,12 @@
 import {Duration, Stack, StackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
-import {Bucket} from "aws-cdk-lib/aws-s3";
+import {Bucket, EventType} from "aws-cdk-lib/aws-s3";
 import {LambdaIntegration, RestApi} from "aws-cdk-lib/aws-apigateway";
 import {Effect, PolicyDocument, PolicyStatement, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {NodejsFunction} from "aws-cdk-lib/aws-lambda-nodejs";
 import {Runtime} from "aws-cdk-lib/aws-lambda";
 import {join} from "path";
+import {LambdaDestination} from "aws-cdk-lib/aws-s3-notifications";
 
 export class CdkInfraStack extends Stack {
     constructor(scope: Construct, id: string, props?: StackProps) {
@@ -13,6 +14,8 @@ export class CdkInfraStack extends Stack {
         const pictureBucket = new Bucket(this, "pictureBucket", {
             bucketName: "picturebucket-assets",
         });
+
+
 
         const restGateway = new RestApi(this, "assets-api", {
             restApiName: "Static assets provider",
@@ -58,7 +61,8 @@ export class CdkInfraStack extends Stack {
             entry: join(__dirname, '/lambda/imageUploader.ts'),
             environment: {
                 'BUCKET_NAME': pictureBucket.bucketName,
-            }
+            },
+            role: inlineUploadPictures
         });
 
         const s3PictureBucketAccess = new PolicyDocument({
@@ -101,6 +105,14 @@ export class CdkInfraStack extends Stack {
             role: inlinePolicyForTextractLambdaRole,
         });
 
+        // trigger lambda on put events on pictureBucket s3 bucket, in folder driverLicense
+        pictureBucket.addEventNotification(
+            EventType.OBJECT_CREATED,
+            new LambdaDestination(textractPullDriverLicenseInfoLambda),
+            {prefix: 'driverLicense/'},
+
+        )
+
         const rekogitionAccess = new PolicyDocument({
             statements: [
                 new PolicyStatement({
@@ -119,6 +131,8 @@ export class CdkInfraStack extends Stack {
                 S3Access: s3PictureBucketAccess
             }
         });
+
+        // will be triggered by frontend call
         const compareTwoImagesLambda = new NodejsFunction(this, 'compareTwoImagesLambda', {
             memorySize: 1024,
             timeout: Duration.seconds(5),
@@ -131,8 +145,10 @@ export class CdkInfraStack extends Stack {
             role: compareTwoFacesRole
         });
 
-
         const images_api = restGateway.root.addResource("images");
         images_api.addMethod('Post', new LambdaIntegration(uploadFileLambda))
+
+        const compareFaces = restGateway.root.addResource("compareFaces");
+        compareFaces.addMethod('Post', new LambdaIntegration(compareTwoImagesLambda))
     }
 }

@@ -6,7 +6,8 @@ const s3 = new AWS.S3()
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<any> => {
     const bucketName = process.env.BUCKET_NAME as string;
-    const jsonBody = JSON.parse(event?.body || "")
+    // @ts-ignore
+    const jsonBody = JSON.parse(Buffer.from(event.body, 'base64').toString());
     const errorCode = (message: string) => {
         return {
             statusCode: 400,
@@ -19,7 +20,6 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<any> => {
             })
         }
     }
-
     if (!jsonBody) {
         return errorCode("No input body");
     }
@@ -28,12 +28,14 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<any> => {
 
     // %Y-%m-%d %H:%M:%S%
     const unique_id = (new Date().toISOString().slice(0, 10))
-    const full_path = `${unique_id}/${file_name}`;
+    const full_path = `driverLicense/${unique_id}/${file_name}`;
+    const buf = Buffer.from(fileBase64.replace(/^data:image\/\w+;base64,/, ""),'base64')
 
     const putObjectInput: PutObjectRequest = {
         Bucket: bucketName,
-        Body: fileBase64,
+        Body: buf,
         ContentType: 'image/jpg',
+        ContentEncoding: 'base64',
         Key: full_path
     }
     const response = await s3.putObject(putObjectInput).promise();

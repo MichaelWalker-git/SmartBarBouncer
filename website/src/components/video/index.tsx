@@ -16,26 +16,19 @@ export const Video = () => {
         getVideo();
     }, [videoRef]);
 
-    const toBase64 = (file: any) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    })
-
     const onSubmitForm = async () => {
-        const fileBase64 = await toBase64(mostRecentPhoto)
+        console.log(mostRecentPhoto, "most recent")
         const body = {
-            name: "file.name",
-            file: fileBase64
+            name: "DriverLicense",
+            file: mostRecentPhoto
         }
-        fetch(`${process.env.API_GATEWAY}/images`, {
+        fetch(`https://b32lq6lxd2.execute-api.us-west-2.amazonaws.com/prod/images`, {
             method: 'POST',
             body: JSON.stringify(body)
         })
             .then(res => res.json())
             .then(data => setImage(data.image_path))
-            .catch(() => console.log('oh no :('))
+            .catch((error) => console.log('oh no :(', error))
     }
 
     const getVideo = () => {
@@ -53,7 +46,6 @@ export const Video = () => {
             });
     };
 
-
     const takePhoto = () => {
         const photo: HTMLCanvasElement = photoRef.current as HTMLCanvasElement;
         const strip = stripRef.current;
@@ -63,9 +55,7 @@ export const Video = () => {
 
         console.log(cWidth, cHeight, "videoCurrent")
 
-        photo?.getContext('2d')?.drawImage(videoCurrent, 0, 0, 100, 100);
-
-
+        photo?.getContext('2d')?.drawImage(videoCurrent, 0, 0, 200, 200);
         const data = photo.toDataURL("image/jpeg");
 
         console.warn(data);
@@ -75,7 +65,7 @@ export const Video = () => {
         link.innerHTML = `<img src='${data}' alt='thumbnail'/>`;
         // @ts-ignore
         strip?.insertBefore(link, strip?.firstChild);
-        setInitialPhotoSrc(data);
+        setInitialPhotoSrc(photo.toDataURL());
     };
 
     return (

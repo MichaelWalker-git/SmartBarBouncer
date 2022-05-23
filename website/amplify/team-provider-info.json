@@ -1,0 +1,23 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-barbouncer-dev-222120-authRole",
+      "UnauthRoleArn": "arn:aws:iam::098305555551:role/amplify-barbouncer-dev-222120-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::098305555551:role/amplify-barbouncer-dev-222120-authRole",
+      "Region": "us-west-2",
+      "DeploymentBucketName": "amplify-barbouncer-dev-222120-deployment",
+      "UnauthRoleName": "amplify-barbouncer-dev-222120-unauthRole",
+      "StackName": "amplify-barbouncer-dev-222120",
+      "StackId": "arn:aws:cloudformation:us-west-2:098305555551:stack/amplify-barbouncer-dev-222120/2f1d2860-da58-11ec-a017-0653ba8cf749",
+      "AmplifyAppId": "d1ts8radoyn6xd"
+    },
+    "categories": {
+      "hosting": {
+        "amplifyhosting": {
+          "appId": "d1ts8radoyn6xd",
+          "type": "manual"
+        }
+      }
+    }
+  }
+}
